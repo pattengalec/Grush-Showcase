@@ -2014,6 +2014,7 @@ function buildResponse(g){
 // ============================================================
 //  CAMERA CHOREOGRAPHY
 // ============================================================
+let cam_pushActive=false, cam_frozenAng=0, cam_angBase=0;
 function startCameraTrack(cottage){
 camTrack=cottage.cam; camStartTime=clock.getElapsedTime(); camActive=true; manualControl=false;
   cam_pushActive=false; cam_frozenAng=0; cam_angBase=0;
@@ -2024,7 +2025,6 @@ function easeInOut(t){ return t*t*(3-2*t); } // smoothstep — gentler accel/dec
 function lerp(a,b,t){ return a+(b-a)*t; }
 function v3lerp(a,b,t){ return [lerp(a[0],b[0],t),lerp(a[1],b[1],t),lerp(a[2],b[2],t)]; }
 const _look=new THREE.Vector3();
-let cam_pushActive=false, cam_frozenAng=0, cam_angBase=0;
 function updateCamera(){
   // DOCKING SHOT takes priority: live in the closing gap, low 3/4 on the cone mesh
  if(false && dockCamActive){
@@ -2084,6 +2084,9 @@ function updateCamera(){
     pos=[homeX,homeY,homeZ];
     look=[0,0.6,0];
   }
+  const DAMP=0.12; // per-frame easing toward target pos/look — lower = smoother/slower
+  camera.position.x += (pos[0]-camera.position.x)*DAMP;
+  camera.position.y += (pos[1]-camera.position.y)*DAMP;
   camera.position.z += (pos[2]-camera.position.z)*DAMP;
   _look.x += (look[0]-_look.x)*DAMP;
   _look.y += (look[1]-_look.y)*DAMP;
@@ -2239,7 +2242,7 @@ addEventListener('DOMContentLoaded',()=>{
 });
 
 // allow manual orbit: if user drags, hand control to OrbitControls for this scene
-addEventListener('pointerdown',()=>{ if(controls && currentIndex>=0){ manualControl=true; controls.enabled=true; } });
+if(renderer&&renderer.domElement){ renderer.domElement.addEventListener('pointerdown',()=>{ if(controls && currentIndex>=0){ manualControl=true; controls.enabled=true; } }); }
 
 function animate(){
   requestAnimationFrame(animate);
