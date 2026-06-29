@@ -1869,7 +1869,7 @@ function showCaption(text,accent){
 }
 
 // ---- audio (external files, getgrush unlock pattern) ----
-const NARRATION_AUDIO={intro:"showcase_audio/intro.mp3",grow:"showcase_audio/grow.mp3",myco:"showcase_audio/myco.mp3",shop:"showcase_audio/shop.mp3",lab:"showcase_audio/lab.mp3",dr:"showcase_audio/dr.mp3"};
+const NARRATION_AUDIO={intro:"intro.mp3",grow:"grow.mp3",myco:"myco.mp3",shop:"shop.mp3",lab:"lab.mp3",dr:"dr.mp3"};
 let audioUnlocked=false, htmlAudio=null;
 const AUDIO_POOL={};
 function preloadAudio(){ if(Object.keys(AUDIO_POOL).length)return; for(const k in NARRATION_AUDIO){const a=new Audio(NARRATION_AUDIO[k]);a.preload="auto";a.volume=1;AUDIO_POOL[k]=a;} }
