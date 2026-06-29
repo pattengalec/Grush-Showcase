@@ -2103,10 +2103,8 @@ function selectCottage(i,{speak=true}={}){
   document.documentElement.style.setProperty('--accent',c.accent);
  while(fitoutGroup.children.length) fitoutGroup.remove(fitoutGroup.children[0]);
   const fg=new THREE.Group(); c.build(fg); fitoutGroup.add(fg);
-  // clean slate: hide any previously-docked unit so the host shows its capped standalone pocket end
+ // clean slate: hide any previously-docked unit — host shows its capped standalone pocket end
   if(dockUnit){ dockUnit.visible=false; docking=false; dockSeated=false; }
-  // every transition: a second unit docks onto the host pocket end, camera on the mesh
-  if(clock && !manualControl){ startDock(); dockCamActive=true; dockCamStart=clock.getElapsedTime(); }
   document.querySelectorAll('.card').forEach((el,idx)=>el.classList.toggle('active',idx===i));
   const panel=document.getElementById('panel');
   panel.style.setProperty('--accent',c.accent);
@@ -2114,22 +2112,27 @@ function selectCottage(i,{speak=true}={}){
     <h2>${c.name}</h2><p class="desc">${c.desc}</p>
     <ul>${c.feats.map(f=>`<li>${f}</li>`).join('')}</ul>`;
   panel.classList.add('show');
-  // dock first (silent), THEN reveal interior + start narration in sync
-  const beginInterior=()=>{
-    showCaption(c.narration,c.accent);
-    startCameraTrack(c);   // camStartTime reset by dock handoff anyway
-    if(speak && audioOn){
-      const ok=playClip(c.key,()=>{ if(autoPlay) scheduleNext(); });
-      if(!ok) speak_(c.narration,()=>{ if(autoPlay) scheduleNext(); });
-    } else if(autoPlay) scheduleNext();
+  // DEMO FIRST: cottage on screen, drone demo + narration start together (in sync — no bleed).
+  // When narration ENDS, the dock plays (orbit resumes, second unit slides in → pauses → seats),
+  // and only after the dock seats do we advance to the next cottage.
+  showCaption(c.narration,c.accent);
+  startCameraTrack(c);
+  const afterNarration=()=>{
+    if(clock && !manualControl){
+      startDock();                       // second unit slides in, caught by the drone
+      window.__seatPoll && clearInterval(window.__seatPoll);
+      window.__seatPoll=setInterval(()=>{ // wait for seat, hold a beat, then advance
+        if(dockSeated){
+          clearInterval(window.__seatPoll);
+          if(autoPlay){ clearTimeout(window.__afterSeat); window.__afterSeat=setTimeout(scheduleNext,1100); }
+        }
+      },120);
+    } else if(autoPlay){ scheduleNext(); }
   };
-  if(clock && !manualControl){
-    // hold narration until the dock shot completes
-    clearTimeout(window.__dockTimer);
-    window.__dockTimer=setTimeout(beginInterior, DOCK_CAM_DUR*1000);
-  } else {
-    beginInterior();
-  }
+  if(speak && audioOn){
+    const ok=playClip(c.key,afterNarration);
+    if(!ok) speak_(c.narration,afterNarration);
+  } else { afterNarration(); }
 }
 
 function showCaption(text,accent){
