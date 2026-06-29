@@ -1726,6 +1726,7 @@ function buildBulkhead(xPos,type){
 // ============================================================
 let dockUnit=null, dockPins=[], dockPockets=[], dockZonesA=[], dockZonesB=[];
 let docking=false, dockStart=0, dockDur=4.2, dockSeated=false, dockPulse=0;
+let dockMode='full';   // 'full' = slow teaching dock (with hold); 'snap' = fast exclamation
 const HOST_POCKET_X = iL/2;          // host pocket end
 const DOCK_GAP = 0.0;                // seated gap between faces
 const DOCK_OFFSET = 9.0;             // how far out the unit starts (+X)
@@ -1794,7 +1795,9 @@ function buildDockUnit(){
   chassisGroup.traverse(o=>{ if(o.isMesh && o.geometry && o.geometry.type==='TorusGeometry') dockPockets.push(o); });
 }
 
-function startDock(){
+function startDock(mode){
+  dockMode = (mode==='snap') ? 'snap' : 'full';
+  dockDur  = (dockMode==='snap') ? 1.1 : 4.2;   // snap = fast slam; full = slow with hold
   buildDockUnit();
   dockUnit.visible=true; docking=true; dockSeated=false; dockPulse=0;
   dockStart=clock.getElapsedTime();
@@ -1808,13 +1811,20 @@ function updateDock(){
   const holdX  = HOST_POCKET_X + iL/2 + 2.2;            // pause point: in view, gap still open
   const endX   = HOST_POCKET_X + iL/2 + DOCK_GAP;       // seated
   const ez = s => s<0.5 ? 2*s*s : 1-Math.pow(-2*s+2,2)/2; // easeInOut
-  // phase split: 0–45% approach, 45–62% hold, 62–100% seat
   if(t>=1){
     dockUnit.position.x = endX; dockUnit.position.y = 0;
     if(!dockSeated){ dockSeated=true; dockPulse=1.0; }
     docking=false;
     return;
   }
+  if(dockMode==='snap'){
+    // SNAP — one continuous fast slide all the way to the seat, no hold. Exclamation point.
+    const s=ez(t);
+    dockUnit.position.x = startX + (endX-startX)*s;
+    dockUnit.position.y = 0.5*(1-s);
+    return;
+  }
+  // FULL — phase split: 0–45% approach, 45–62% hold, 62–100% seat
   if(t<0.45){               // PHASE 1 — slide into view, stop at hold point
     const s=ez(t/0.45);
     dockUnit.position.x = startX + (holdX-startX)*s;
@@ -2064,23 +2074,11 @@ function lerp(a,b,t){ return a+(b-a)*t; }
 function v3lerp(a,b,t){ return [lerp(a[0],b[0],t),lerp(a[1],b[1],t),lerp(a[2],b[2],t)]; }
 const _look=new THREE.Vector3();
 function updateCamera(){
-  if(!camActive||!camTrack||manualControl) return;
-
-  // smoothstep ease
-  const ease=(t)=>{ t=Math.max(0,Math.min(1,t)); return t*t*(3-2*t); };
-  // map u in [a,b] -> 0..1
-  const seg=(u,a,b)=> ease((u-a)/(b-a));
-
-  // ---- Scene-relative framing constants (derived from geometry) ----
-  const HALF_X   = iL/2;          // host half-length on X (~6.07): -HALF_X = pin end, +HALF_X = pocket/dock end
-  const FRONTZ   = 3.6;           // how far out on +Z (open wall side) the camera flies for the close pass
-  const EYE_Y    = 1.9;           // eye height for the front-wall pass (raised, above mid)
-  const LOOK_Y   = 0.6;           // look height into the cottage
-
-  // ---- DOCK OVERRIDE: hold a wide establishing shot while the unit slides in / once seated ----
-  if(docking || dockSeated){
-    // Two whole 12m units sit on the X axis; their combined span centers near +HALF_X.
-    const cx = HALF_X;            // center between host and incoming unit
+  // ---- DOCK OVERRIDE: frame the wide establishing shot whenever a dock is happening
+  //      (runs even during the intro, before any cottage is selected). manualControl still wins.
+  if((docking || dockSeated) && !manualControl){
+    const HALF_X = iL/2;
+    const cx = HALF_X;
     const pos  = [cx, 6.0, 24.0]; // high & far: both whole buildings in frame
     const look = [cx, 0.3, 0];
     const D=0.10;
@@ -2093,6 +2091,19 @@ function updateCamera(){
     camera.lookAt(_look);
     return;
   }
+
+  if(!camActive||!camTrack||manualControl) return;
+
+  // smoothstep ease
+  const ease=(t)=>{ t=Math.max(0,Math.min(1,t)); return t*t*(3-2*t); };
+  // map u in [a,b] -> 0..1
+  const seg=(u,a,b)=> ease((u-a)/(b-a));
+
+  // ---- Scene-relative framing constants (derived from geometry) ----
+  const HALF_X   = iL/2;          // host half-length on X (~6.07): -HALF_X = pin end, +HALF_X = pocket/dock end
+  const FRONTZ   = 3.6;           // how far out on +Z (open wall side) the camera flies for the close pass
+  const EYE_Y    = 1.9;           // eye height for the front-wall pass (raised, above mid)
+  const LOOK_Y   = 0.6;           // look height into the cottage
 
   const dur=CLIP_DUR[COTTAGES[currentIndex].key]||28;
   let f=(clock.getElapsedTime()-camStartTime)/dur; // 0..1 across the clip
@@ -2180,12 +2191,12 @@ function selectCottage(i,{speak=true}={}){
   startCameraTrack(c);
   const afterNarration=()=>{
     if(clock && !manualControl){
-      startDock();                       // second unit slides in, caught by the drone
+      startDock('snap');                 // quick exclamation: buildings connect fast
       window.__seatPoll && clearInterval(window.__seatPoll);
       window.__seatPoll=setInterval(()=>{ // wait for seat, hold a beat, then advance
         if(dockSeated){
           clearInterval(window.__seatPoll);
-          if(autoPlay){ clearTimeout(window.__afterSeat); window.__afterSeat=setTimeout(scheduleNext,1100); }
+          if(autoPlay){ clearTimeout(window.__afterSeat); window.__afterSeat=setTimeout(scheduleNext,400); }
         }
       },120);
     } else if(autoPlay){ scheduleNext(); }
@@ -2273,6 +2284,7 @@ addEventListener('DOMContentLoaded',()=>{
     document.getElementById('hero').classList.add('hidden');
     document.getElementById('controls').classList.add('show');
     showCaption("One docking chassis. Infinite ways to use it.",'#00c8ff');
+    startDock('full');   // full teaching dock plays over the intro narration
     const ok=playClip('intro',()=>{ const he=document.getElementById('hero'); if(he)he.style.display='none'; enterShowcase(true); });
     if(!ok){ document.getElementById('hero').style.display='none'; enterShowcase(true); }
     setTimeout(()=>{ const he=document.getElementById('hero'); if(he)he.style.display='none'; },900);
@@ -2287,6 +2299,7 @@ addEventListener('DOMContentLoaded',()=>{
     document.getElementById('hero').classList.add('hidden');
     document.getElementById('controls').classList.add('show');
     showCaption("One docking chassis. Infinite ways to use it.",'#00c8ff');
+    startDock('full');   // full teaching dock plays over the intro narration
     const ok=playClip('intro',()=>{ const he=document.getElementById('hero'); if(he)he.style.display='none'; enterShowcase(true); });
     if(!ok){ document.getElementById('hero').style.display='none'; enterShowcase(true); }
     setTimeout(()=>{ const he=document.getElementById('hero'); if(he)he.style.display='none'; },900);
