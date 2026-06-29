@@ -2027,7 +2027,7 @@ const _look=new THREE.Vector3();
 let cam_pushActive=false, cam_frozenAng=0, cam_angBase=0;
 function updateCamera(){
   // DOCKING SHOT takes priority: live in the closing gap, low 3/4 on the cone mesh
-  if(dockCamActive){
+ if(false && dockCamActive){
     const dt=(clock.getElapsedTime()-dockCamStart)/DOCK_CAM_DUR;
     // WIDE establishing shot: both full containers visible, sliding together and connecting.
     // Seated chain spans roughly x[-6 .. 18], center ~x=6.
