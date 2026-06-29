@@ -1712,7 +1712,7 @@ function buildBulkhead(xPos,type){
 //  DOCKING SECOND UNIT — slides in pin-first to the host pocket end (+X)
 // ============================================================
 let dockUnit=null, dockPins=[], dockPockets=[], dockZonesA=[], dockZonesB=[];
-let docking=false, dockStart=0, dockDur=2.2, dockSeated=false, dockPulse=0;
+let docking=false, dockStart=0, dockDur=4.2, dockSeated=false, dockPulse=0;
 const HOST_POCKET_X = iL/2;          // host pocket end
 const DOCK_GAP = 0.0;                // seated gap between faces
 const DOCK_OFFSET = 9.0;             // how far out the unit starts (+X)
@@ -1766,19 +1766,29 @@ function startDock(){
 function updateDock(){
   if(!docking||!dockUnit) return;
   const t=(clock.getElapsedTime()-dockStart)/dockDur;
+  const startX = HOST_POCKET_X + iL/2 + DOCK_OFFSET;   // far out
+  const holdX  = HOST_POCKET_X + iL/2 + 2.2;            // pause point: in view, gap still open
+  const endX   = HOST_POCKET_X + iL/2 + DOCK_GAP;       // seated
+  const ez = s => s<0.5 ? 2*s*s : 1-Math.pow(-2*s+2,2)/2; // easeInOut
+  // phase split: 0–45% approach, 45–62% hold, 62–100% seat
   if(t>=1){
-    // seated
-    dockUnit.position.x = HOST_POCKET_X + iL/2 + DOCK_GAP;
-    dockUnit.position.y = 0;
+    dockUnit.position.x = endX; dockUnit.position.y = 0;
     if(!dockSeated){ dockSeated=true; dockPulse=1.0; }
     docking=false;
     return;
   }
-  const e = t<0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2; // easeInOut
-  const startX = HOST_POCKET_X + iL/2 + DOCK_OFFSET;
-  const endX   = HOST_POCKET_X + iL/2 + DOCK_GAP;
-  dockUnit.position.x = startX + (endX-startX)*e;
-  dockUnit.position.y = 0.5*(1-e);  // lower into place
+  if(t<0.45){               // PHASE 1 — slide into view, stop at hold point
+    const s=ez(t/0.45);
+    dockUnit.position.x = startX + (holdX-startX)*s;
+    dockUnit.position.y = 0.5*(1-s*0.4);   // mostly still raised
+  } else if(t<0.62){        // PHASE 2 — hold, hovering, gap open
+    dockUnit.position.x = holdX;
+    dockUnit.position.y = 0.5*0.6;
+  } else {                  // PHASE 3 — final slide + lower into seat
+    const s=ez((t-0.62)/0.38);
+    dockUnit.position.x = holdX + (endX-holdX)*s;
+    dockUnit.position.y = (0.5*0.6)*(1-s);
+  }
 }
 
 // ============================================================
