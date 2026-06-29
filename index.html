@@ -1448,7 +1448,7 @@ const ZONES = [
   {id:'Z3',u: 0.850,h:1.150,col:0x9fcfe0,sz:[0.24,0.24]},
   {id:'Z3',u: 0.850,h:1.950,col:0x9fcfe0,sz:[0.24,0.24]},
 ];
-const CONES=[{u:-0.864,h:1.992},{u:0.864,h:0.593}];
+const CONES=[{u:-0.864,h:2.285},{u:0.864,h:0.300}];  // v034 SCAD: pins at TL/BR diagonal corners (inset 300mm)
 
 // Clip durations (s) — measured from the real audio
 const CLIP_DUR={intro:22.2,grow:32.304,myco:25.248,shop:24.336,lab:30.792,dr:30.408};
@@ -1678,6 +1678,7 @@ function buildChassisDiorama(){
 function buildBulkhead(xPos,type){
   const g=new THREE.Group(); g.position.x=xPos;
   const sign=xPos<0?1:-1;
+  const out = -sign;   // outward direction along X: pin(-X end)=>-1, pocket(+X end)=>+1
   const plate=new THREE.Mesh(new THREE.BoxGeometry(0.10,iH*0.99,iW*0.99),
     new THREE.MeshStandardMaterial({color:0x2a3346,roughness:0.5,metalness:0.5}));
   plate.castShadow=true; plate.receiveShadow=true; g.add(plate);
@@ -1685,24 +1686,36 @@ function buildBulkhead(xPos,type){
   const pass=new THREE.Mesh(new THREE.BoxGeometry(0.12,2.032,0.914),
     new THREE.MeshStandardMaterial({color:0x05080f,roughness:0.9}));
   pass.position.set(0,-iH/2+0.1+2.032/2,0); g.add(pass);
-  // zones (glowing, the hero detail)
+  // ZONES are feed-through: show a glowing face on BOTH sides of the plate
   ZONES.forEach(z=>{
-    const m=new THREE.Mesh(new THREE.BoxGeometry(0.07,z.sz[1],z.sz[0]),
-      new THREE.MeshStandardMaterial({color:z.col,emissive:z.col,emissiveIntensity:0.5,roughness:0.35,metalness:0.3}));
-    m.position.set(sign*0.07,-iH/2+z.h,z.u); g.add(m);
-    // subtle zone glow light
-    const pl=new THREE.PointLight(z.col,0.25,1.6); pl.position.set(sign*0.3,-iH/2+z.h,z.u); g.add(pl);
+    for(const s of [out, -out]){
+      const m=new THREE.Mesh(new THREE.BoxGeometry(0.06,z.sz[1],z.sz[0]),
+        new THREE.MeshStandardMaterial({color:z.col,emissive:z.col,emissiveIntensity:0.5,roughness:0.35,metalness:0.3}));
+      m.position.set(s*0.07,-iH/2+z.h,z.u); g.add(m);
+    }
+    // one subtle glow light on the outward side
+    const pl=new THREE.PointLight(z.col,0.25,1.6); pl.position.set(out*0.3,-iH/2+z.h,z.u); g.add(pl);
   });
   CONES.forEach(cn=>{
     if(type==='pin'){
+      // OUTWARD: the mating cone
       const cone=new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.064,0.178,20),
         new THREE.MeshStandardMaterial({color:0x70809a,roughness:0.35,metalness:0.65}));
-      cone.rotation.z=sign>0?-Math.PI/2:Math.PI/2;
-      cone.position.set(sign*0.16,-iH/2+cn.h,cn.u); g.add(cone);
+      cone.rotation.z=out>0?-Math.PI/2:Math.PI/2;   // tip points outward
+      cone.position.set(out*0.16,-iH/2+cn.h,cn.u); g.add(cone);
+      // INWARD: backing boss so the interior face isn't bare
+      const boss=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.05,20),
+        new THREE.MeshStandardMaterial({color:0x3a4660,roughness:0.5,metalness:0.55}));
+      boss.rotation.z=Math.PI/2; boss.position.set(-out*0.06,-iH/2+cn.h,cn.u); g.add(boss);
     }else{
+      // OUTWARD: the receiving ring
       const ring=new THREE.Mesh(new THREE.TorusGeometry(0.07,0.022,12,24),
         new THREE.MeshStandardMaterial({color:0x46536b,roughness:0.5,metalness:0.5}));
-      ring.position.set(sign*0.05,-iH/2+cn.h,cn.u); g.add(ring);
+      ring.position.set(out*0.05,-iH/2+cn.h,cn.u); g.add(ring);
+      // INWARD: recessed socket face
+      const socket=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.04,20),
+        new THREE.MeshStandardMaterial({color:0x1c2433,roughness:0.7,metalness:0.4}));
+      socket.rotation.z=Math.PI/2; socket.position.set(-out*0.05,-iH/2+cn.h,cn.u); g.add(socket);
     }
   });
   chassisGroup.add(g);
@@ -1734,21 +1747,46 @@ function buildDockUnit(){
     const post=new THREE.Mesh(new THREE.BoxGeometry(0.14,iH,0.14),postMat); post.position.set(sx*(segLen/2),0,sz*(iW/2)); dockUnit.add(post);
     for(const sy of [-1,1]){ const cst=new THREE.Mesh(new THREE.BoxGeometry(0.2,0.16,0.2),castMat); cst.position.set(sx*(segLen/2),sy*(iH/2-0.08),sz*(iW/2)); dockUnit.add(cst); }
   }
-  // PIN bulkhead on this unit's -X face (faces the host pocket end)
-  const bg=new THREE.Group(); bg.position.x=-segLen/2;
-  const plate=new THREE.Mesh(new THREE.BoxGeometry(0.10,iH*0.99,iW*0.99),new THREE.MeshStandardMaterial({color:0x2a3346,roughness:0.5,metalness:0.5})); bg.add(plate);
-  ZONES.forEach(z=>{
-    const m=new THREE.Mesh(new THREE.BoxGeometry(0.07,z.sz[1],z.sz[0]),
-      new THREE.MeshStandardMaterial({color:z.col,emissive:z.col,emissiveIntensity:0.4,roughness:0.35,metalness:0.3}));
-    m.position.set(-0.07,-iH/2+z.h,z.u); bg.add(m); dockZonesB.push(m);
-  });
-  CONES.forEach(cn=>{
-    const cone=new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.064,0.178,20),
-      new THREE.MeshStandardMaterial({color:0x70809a,roughness:0.35,metalness:0.65}));
-    cone.rotation.z=Math.PI/2;                       // point toward -X (host)
-    cone.position.set(-0.16,-iH/2+cn.h,cn.u); bg.add(cone); dockPins.push(cone);
-  });
-  dockUnit.add(bg);
+  // ---- helper: build a full both-face bulkhead group for the dock unit ----
+  function dockBulkhead(xFace, kind){
+    const bg=new THREE.Group(); bg.position.x=xFace;
+    const out = xFace<0 ? -1 : 1;   // outward along X
+    const plate=new THREE.Mesh(new THREE.BoxGeometry(0.10,iH*0.99,iW*0.99),
+      new THREE.MeshStandardMaterial({color:0x2a3346,roughness:0.5,metalness:0.5})); bg.add(plate);
+    const pass=new THREE.Mesh(new THREE.BoxGeometry(0.12,2.032,0.914),
+      new THREE.MeshStandardMaterial({color:0x05080f,roughness:0.9}));
+    pass.position.set(0,-iH/2+0.1+2.032/2,0); bg.add(pass);
+    // zones feed through: glowing face on both sides
+    ZONES.forEach(z=>{
+      for(const s of [out,-out]){
+        const m=new THREE.Mesh(new THREE.BoxGeometry(0.06,z.sz[1],z.sz[0]),
+          new THREE.MeshStandardMaterial({color:z.col,emissive:z.col,emissiveIntensity:0.4,roughness:0.35,metalness:0.3}));
+        m.position.set(s*0.07,-iH/2+z.h,z.u); bg.add(m);
+        if(s===out && kind==='pin') dockZonesB.push(m);   // pulse target lives on the mating (outward) face
+      }
+    });
+    CONES.forEach(cn=>{
+      if(kind==='pin'){
+        const cone=new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.064,0.178,20),
+          new THREE.MeshStandardMaterial({color:0x70809a,roughness:0.35,metalness:0.65}));
+        cone.rotation.z=out>0?-Math.PI/2:Math.PI/2; cone.position.set(out*0.16,-iH/2+cn.h,cn.u);
+        bg.add(cone); dockPins.push(cone);
+        const boss=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.05,20),
+          new THREE.MeshStandardMaterial({color:0x3a4660,roughness:0.5,metalness:0.55}));
+        boss.rotation.z=Math.PI/2; boss.position.set(-out*0.06,-iH/2+cn.h,cn.u); bg.add(boss);
+      }else{
+        const ring=new THREE.Mesh(new THREE.TorusGeometry(0.07,0.022,12,24),
+          new THREE.MeshStandardMaterial({color:0x46536b,roughness:0.5,metalness:0.5}));
+        ring.position.set(out*0.05,-iH/2+cn.h,cn.u); bg.add(ring);
+        const socket=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.04,20),
+          new THREE.MeshStandardMaterial({color:0x1c2433,roughness:0.7,metalness:0.4}));
+        socket.rotation.z=Math.PI/2; socket.position.set(-out*0.05,-iH/2+cn.h,cn.u); bg.add(socket);
+      }
+    });
+    dockUnit.add(bg);
+  }
+  dockBulkhead(-segLen/2,'pin');     // -X face: mates with host pocket
+  dockBulkhead( segLen/2,'pocket');  // +X face: now a real pocket bulkhead (was missing)
   dockUnit.position.x = HOST_POCKET_X + iL/2 + DOCK_OFFSET; // start far out +X
   dockUnit.visible=false;
   scene.add(dockUnit);
@@ -2026,65 +2064,85 @@ function lerp(a,b,t){ return a+(b-a)*t; }
 function v3lerp(a,b,t){ return [lerp(a[0],b[0],t),lerp(a[1],b[1],t),lerp(a[2],b[2],t)]; }
 const _look=new THREE.Vector3();
 function updateCamera(){
-  // DOCKING SHOT takes priority: live in the closing gap, low 3/4 on the cone mesh
- if(false && dockCamActive){
-    const dt=(clock.getElapsedTime()-dockCamStart)/DOCK_CAM_DUR;
-    // WIDE establishing shot: both full containers visible, sliding together and connecting.
-    // Seated chain spans roughly x[-6 .. 18], center ~x=6.
-    const chainCenterX = HOST_POCKET_X; // ~6, centered on the join region of the full chain
-    if(dt<1 && !manualControl){
-      const e=dt<0.5?2*dt*dt:1-Math.pow(-2*dt+2,2)/2;
-      // gentle push-in over the move, but stay wide enough to see BOTH whole units
-      const camX = chainCenterX;
-      const camY = 6.5 - 1.0*e;            // high enough to see both, eases down a touch
-      const camZ = 25 - 2.0*e;             // far back; both whole units in frame, crisp (fog pushed to 45)
-      camera.position.set(camX,camY,camZ);
-      _look.set(chainCenterX, 0.2, 0);     // look at the whole chain
-      camera.lookAt(_look);
-      return;
-    } else {
-      dockCamActive=false; // hand off to the cottage interior track
-    }
+  if(!camActive||!camTrack||manualControl) return;
+
+  // smoothstep ease
+  const ease=(t)=>{ t=Math.max(0,Math.min(1,t)); return t*t*(3-2*t); };
+  // map u in [a,b] -> 0..1
+  const seg=(u,a,b)=> ease((u-a)/(b-a));
+
+  // ---- Scene-relative framing constants (derived from geometry) ----
+  const HALF_X   = iL/2;          // host half-length on X (~6.07): -HALF_X = pin end, +HALF_X = pocket/dock end
+  const FRONTZ   = 3.6;           // how far out on +Z (open wall side) the camera flies for the close pass
+  const EYE_Y    = 1.9;           // eye height for the front-wall pass (raised, above mid)
+  const LOOK_Y   = 0.6;           // look height into the cottage
+
+  // ---- DOCK OVERRIDE: hold a wide establishing shot while the unit slides in / once seated ----
+  if(docking || dockSeated){
+    // Two whole 12m units sit on the X axis; their combined span centers near +HALF_X.
+    const cx = HALF_X;            // center between host and incoming unit
+    const pos  = [cx, 6.0, 24.0]; // high & far: both whole buildings in frame
+    const look = [cx, 0.3, 0];
+    const D=0.10;
+    camera.position.x += (pos[0]-camera.position.x)*D;
+    camera.position.y += (pos[1]-camera.position.y)*D;
+    camera.position.z += (pos[2]-camera.position.z)*D;
+    _look.x += (look[0]-_look.x)*D;
+    _look.y += (look[1]-_look.y)*D;
+    _look.z += (look[2]-_look.z)*D;
+    camera.lookAt(_look);
+    return;
   }
- if(!camActive||!camTrack||manualControl) return;
+
   const dur=CLIP_DUR[COTTAGES[currentIndex].key]||28;
   let f=(clock.getElapsedTime()-camStartTime)/dur; // 0..1 across the clip
   if(f>=1){ f=1; }
 
-  // ---- DRONE ORBIT (home base) ----
-  const ORBIT_R=13.5, ORBIT_Y=5.0, ORBIT_SPD=0.13;
-  // ---- HELICOPTER PUSH-IN (per narration beat) ----
-  const PUSH_HALF=0.055;   // half-width of each push window in clip-fraction (~ how long a beat lasts)
-  const PUSH_IN=0.62;      // how far toward the topic we zoom (0=stay at drone, 1=all the way to look-pt)
-  const PUSH_Y=2.4;        // drone dips to this height at full push
-
-  // Is f inside a beat window? Find nearest keyframe and how deep into its push we are.
-  let beat=null, pushAmt=0;
-  for(let i=0;i<camTrack.length;i++){
-    const d=Math.abs(f-camTrack[i].t);
-    if(d<=PUSH_HALF){ beat=camTrack[i]; pushAmt=easeInOut(1-(d/PUSH_HALF)); break; }
-  }
-
-  // Orbit angle: ADVANCES with time, but FREEZES while a push is active so the camera holds on the topic.
-  if(!cam_pushActive && pushAmt>0.001){ cam_pushActive=true; cam_frozenAng=(clock.getElapsedTime()-camStartTime)*ORBIT_SPD; }
-  if(cam_pushActive && pushAmt<=0.001){ cam_pushActive=false; cam_angBase += (clock.getElapsedTime()-camStartTime)*ORBIT_SPD - cam_frozenAng; }
-  const liveAng=(clock.getElapsedTime()-camStartTime)*ORBIT_SPD;
-  const ang = cam_angBase + (cam_pushActive ? cam_frozenAng : liveAng) + Math.PI*0.25;
-
-  // Home (drone) position on the orbit circle.
-  const homeX=Math.cos(ang)*ORBIT_R, homeZ=Math.sin(ang)*ORBIT_R, homeY=ORBIT_Y;
-  // Push target = this beat's look-point, pulled in along the home->target line.
+  // ============================================================
+  //  FOUR-PHASE FLYBY  (auto-fits each clip via f)
+  //   P1 0.00-0.20  head-on on PIN BULKHEAD (-X end face), raised
+  //   P2 0.20-0.40  pan around to the LEFT edge of the open front (+Z) wall
+  //   P3 0.40-0.85  slow traverse LEFT->RIGHT (-X -> +X) along the front wall
+  //   P4 0.85-1.00  pull OUT from the right end until both buildings can frame up
+  // ============================================================
   let pos, look;
-  if(beat && pushAmt>0.001){
-    const tx=beat.look[0], ty=beat.look[1], tz=beat.look[2];
-    const k=PUSH_IN*pushAmt;
-    pos=[ homeX+(tx-homeX)*k, homeY+(PUSH_Y-homeY)*pushAmt, homeZ+(tz-homeZ)*k ];
-    look=[ tx, ty, tz ];
+
+  if(f < 0.20){
+    // P1: straight on the pin bulkhead, camera out past -X, slightly raised
+    const t=seg(f,0.0,0.20);
+    // start a touch wider/higher, settle to a clean head-on
+    const camX = -HALF_X - (7.5 - 1.0*t);
+    const camY = 2.8 - 0.3*t;
+    const camZ = 0.0 + 0.0*t;
+    pos  = [camX, camY, camZ];
+    look = [-HALF_X, LOOK_Y, 0];
+  } else if(f < 0.40){
+    // P2: arc from the -X head-on around to the LEFT edge of the +Z front wall
+    const t=seg(f,0.20,0.40);
+    // sweep angle from facing -X (180deg) toward facing +Z front-left (~135deg)
+    const ang = Math.PI*(1.0 - 0.25*t);        // 180deg -> 135deg
+    const r   = 9.0 - (9.0-FRONTZ-2.0)*t;       // pull the radius in as we arc
+    const camX = Math.cos(ang)*r;
+    const camZ = Math.sin(ang)*r;
+    pos  = [camX, 2.8 - (2.8-EYE_Y)*t, camZ];
+    // look slides from the bulkhead toward the left end of the cottage interior
+    look = [ -HALF_X + 1.0*t, LOOK_Y, 0 ];
+  } else if(f < 0.85){
+    // P3: slow lateral traverse along the open front wall, left edge -> right edge
+    const t=seg(f,0.40,0.85);
+    const camX = -HALF_X + (2*HALF_X)*t;        // glide -X -> +X
+    pos  = [camX, EYE_Y, FRONTZ];
+    look = [camX*0.85, LOOK_Y, 0];              // look slightly ahead into the wall
   } else {
-    pos=[homeX,homeY,homeZ];
-    look=[0,0.6,0];
+    // P4: from the right end, pull out & up to reveal room for both buildings
+    const t=seg(f,0.85,1.0);
+    pos  = [ HALF_X,
+             EYE_Y + (6.0-EYE_Y)*t,
+             FRONTZ + (24.0-FRONTZ)*t ];
+    look = [ HALF_X*(1-t), 0.3, 0 ];            // ease look from right end toward center
   }
-  const DAMP=0.12; // per-frame easing toward target pos/look — lower = smoother/slower
+
+  const DAMP=0.10; // per-frame easing — lower = smoother/slower
   camera.position.x += (pos[0]-camera.position.x)*DAMP;
   camera.position.y += (pos[1]-camera.position.y)*DAMP;
   camera.position.z += (pos[2]-camera.position.z)*DAMP;
