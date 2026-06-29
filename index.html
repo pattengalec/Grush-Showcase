@@ -2009,7 +2009,7 @@ function startCameraTrack(cottage){
   if(controls) controls.enabled=false;
 }
 function stopCameraTrack(){ camActive=false; }
-function easeInOut(t){ return t<0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2; }
+function easeInOut(t){ return t*t*(3-2*t); } // smoothstep — gentler accel/decel than the old quadratic
 function lerp(a,b,t){ return a+(b-a)*t; }
 function v3lerp(a,b,t){ return [lerp(a[0],b[0],t),lerp(a[1],b[1],t),lerp(a[2],b[2],t)]; }
 const _look=new THREE.Vector3();
