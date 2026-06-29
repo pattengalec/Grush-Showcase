@@ -1797,7 +1797,7 @@ function buildDockUnit(){
 
 function startDock(mode){
   dockMode = (mode==='snap') ? 'snap' : 'full';
-  dockDur  = (dockMode==='snap') ? 1.1 : 4.2;   // snap = fast slam; full = slow with hold
+  dockDur  = (dockMode==='snap') ? 0.8 : 4.2;   // snap = fast slam; full = slow with hold
   buildDockUnit();
   dockUnit.visible=true; docking=true; dockSeated=false; dockPulse=0;
   dockStart=clock.getElapsedTime();
@@ -2196,7 +2196,7 @@ function selectCottage(i,{speak=true}={}){
       window.__seatPoll=setInterval(()=>{ // wait for seat, hold a beat, then advance
         if(dockSeated){
           clearInterval(window.__seatPoll);
-          if(autoPlay){ clearTimeout(window.__afterSeat); window.__afterSeat=setTimeout(scheduleNext,400); }
+          if(autoPlay){ clearTimeout(window.__afterSeat); window.__afterSeat=setTimeout(scheduleNext,200); }
         }
       },120);
     } else if(autoPlay){ scheduleNext(); }
@@ -2234,7 +2234,7 @@ function playClip(key,onend){
   htmlAudio=a; a.currentTime=0; a.volume=1; a.muted=false;
   let done=false; const adv=()=>{ if(done)return; done=true; if(onend)onend(); };
   a.onended=adv;
-  a.play().then(()=>{ const d=(isFinite(a.duration)&&a.duration>0)?a.duration:28; clearTimeout(a.__s); a.__s=setTimeout(adv,(d+1.5)*1000); })
+  a.play().then(()=>{ const d=(isFinite(a.duration)&&a.duration>0)?a.duration:28; clearTimeout(a.__s); a.__s=setTimeout(adv,(d+0.3)*1000); })
    .catch(()=>{ htmlAudio=null; if(window.__spk)window.__spk(key,onend); else adv(); });
   return true;
 }
@@ -2247,7 +2247,7 @@ function speak_(text,onend){ if(!synth){if(onend)setTimeout(onend,6000);return;}
 function stopSpeak(){ if(synth)synth.cancel(); }
 window.__spk=function(key,onend){ const m={intro:"One docking chassis. Infinite ways to use it.",grow:COTTAGES[0].narration,myco:COTTAGES[1].narration,shop:COTTAGES[2].narration,lab:COTTAGES[3].narration,dr:COTTAGES[4].narration}; speak_(m[key]||"",onend); };
 
-function scheduleNext(){ clearTimeout(autoTimer); autoTimer=setTimeout(()=>{ if(!autoPlay)return; const n=(currentIndex+1)%COTTAGES.length; if(n===0){ stopAuto(); if(typeof window.__playOutro==='function') setTimeout(window.__playOutro,1200); return; } selectCottage(n); },900); }
+function scheduleNext(){ clearTimeout(autoTimer); autoTimer=setTimeout(()=>{ if(!autoPlay)return; const n=(currentIndex+1)%COTTAGES.length; if(n===0){ stopAuto(); if(typeof window.__playOutro==='function') setTimeout(window.__playOutro,800); return; } selectCottage(n); },150); }
 function startAuto(){ autoPlay=true; const b=document.getElementById('autoBtn'); b.classList.add('on'); b.textContent='⏸'; if(currentIndex<0)selectCottage(0); else selectCottage(currentIndex); }
 function stopAuto(){ autoPlay=false; clearTimeout(autoTimer); const b=document.getElementById('autoBtn'); b.classList.remove('on'); b.textContent='▶'; }
 
