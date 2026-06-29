@@ -2064,8 +2064,10 @@ function selectCottage(i,{speak=true}={}){
   currentIndex=i;
   const c=COTTAGES[i];
   document.documentElement.style.setProperty('--accent',c.accent);
-  while(fitoutGroup.children.length) fitoutGroup.remove(fitoutGroup.children[0]);
+ while(fitoutGroup.children.length) fitoutGroup.remove(fitoutGroup.children[0]);
   const fg=new THREE.Group(); c.build(fg); fitoutGroup.add(fg);
+  // clean slate: hide any previously-docked unit so the host shows its capped standalone pocket end
+  if(dockUnit){ dockUnit.visible=false; docking=false; dockSeated=false; }
   // every transition: a second unit docks onto the host pocket end, camera on the mesh
   if(clock && !manualControl){ startDock(); dockCamActive=true; dockCamStart=clock.getElapsedTime(); }
   document.querySelectorAll('.card').forEach((el,idx)=>el.classList.toggle('active',idx===i));
